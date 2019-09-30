@@ -25,6 +25,7 @@ class camera
             horizontal = vec3(4.0, 0.0, 0.0);
             vertical = vec3(0.0, 2.0, 0.0);
             lower_left_corner = vec3(-2.0, -1.0, -1.0);
+            lense_radius = 0;
         }
 
         camera(const vec3 &lookfrom,const vec3 &lookat,const vec3 &vup,float vfov, float aspect, float aperture, float focus_dist)
