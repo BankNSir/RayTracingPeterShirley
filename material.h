@@ -39,6 +39,13 @@ bool refract(const vec3 &v, float ni_over_nt, const vec3 &n, vec3 &refracted)
     }
 }
 
+float schlick(float cosine, float ref_idx)
+{
+    float r0 = (1 - ref_idx) / (1 + ref_idx);
+    r0 = r0 * r0;
+    return r0 + (1 - r0)*pow(1 - cosine, 5);
+}
+
 class material
 {
     public:
@@ -51,7 +58,7 @@ class lambertian : public material
         lambertian(const vec3 &a) : albedo(a) {}
         virtual bool scatter(const ray &r_in, const hit_record &rec, vec3 &attenuation, ray &scattered) const
         {
-            scattered = ray(rec.p, rec.normal + random_in_unit_sphere());
+            scattered = ray(rec.p, rec.normal + random_in_unit_sphere(), r_in._time);
             attenuation = albedo;
             return true;
         }
@@ -85,39 +92,53 @@ class dielectric : public material
         {
             attenuation = albedo;
             vec3 refracted;
-            vec3 reflected;
             vec3 outward_normal;
+            vec3 reflected = reflect(r_in.direction(), outward_normal);
             float ni_over_nt; // for setting inversion if ray are coming out of object
+            float cosine;
+            float reflect_prob;
 
             // time to set inverse ray
-            if (dot(r_in.direction(), rec.normal) > 0)  // if inverse >> change setting
+            if (dot(r_in.direction(), rec.normal) > 0)  // insideout
             {
                 ni_over_nt = ref_idx;
                 outward_normal = -1 * rec.normal;
+                cosine = ref_idx * dot(r_in.direction(), rec.normal) / r_in.direction().length();
             }
-            else
+            else  // outsidein
             {
                 ni_over_nt = 1 / ref_idx;
                 outward_normal = rec.normal;
+                cosine = -dot(r_in.direction(), rec.normal) / r_in.direction().length();
             }
             
             // full refracted ray direction expression : (ni/nt)*(vec_in - n * dot(vec_in, n)) - n*sqrt(discriminant)
             // check refract or reflect 
             if (refract(r_in.direction(), ni_over_nt, outward_normal, refracted))
             {
-                scattered = ray(rec.p, refracted);
+                reflect_prob = schlick(cosine, ref_idx);
             }
             else
             {
-                reflected = reflect(r_in.direction(), outward_normal);
-                scattered = ray(rec.p, reflected);
+                reflect_prob = 1.0;
             }
 
+            // random reflect vs refrac
+            if (random() > reflect_prob) // refrac
+            {
+                scattered = ray(rec.p, refracted);
+            }
+            else // reflect
+            {
+                scattered = ray(rec.p, reflected);
+            }
+            
             return true;
         }
 
         vec3 albedo;
         float ref_idx;
+
 };
 
 #endif
